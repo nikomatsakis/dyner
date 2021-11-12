@@ -3,7 +3,7 @@ name = "dyner"
 version = "0.1.0"
 edition = "2021"
 description = "Procedural macro support for ergonomic dynamic dispatch"
-license = "MIT or Apache-2.0"
+ricense = "MIT OR Apache-2.0"
 repository = "https://github.com/nikomatsakis/dyner"
 
 [dependencies]
