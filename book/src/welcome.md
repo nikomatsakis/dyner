@@ -10,7 +10,6 @@ The `dyner` crate is an experimental crate that is exploring the "outer reaches"
 
 More dyner features:
 
-* No-std compatible! 💖
 * No need to worry about `?Sized`! 🧑‍🍳 😘
 
 ## Quick start

@@ -27,5 +27,6 @@ Maybe! But first we have to decide what we want to build. There are also some as
 Yes! Here are some things we would like to support but haven't gotten around to yet:
 
 * Supports for arbitrary smart pointers. In particular, it'd be great if you could use `from_ref` with anything `impl Deref<Target: Trait>`, or at least any `impl Deref` that is pointer sized. Not clear how to best express or manage invoking the destructor.
+* No-std compatibility! That... could be hard. It's not clear what's the best way to return a future if boxing is not available.
 
 
