@@ -30,12 +30,27 @@ async fn ref_mut_dyn_async_iter() {
     do_loop(0..10, &mut dyn_range).await;
 }
 
+/// Test that we get this error
+///
+/// ```notrust
+/// error[E0596]: cannot borrow data in a dereference of `dyner::Ref<DynAsyncIter<'_, u32>>` as mutable
+///   --> src/main.rs:43:5
+///    |
+/// 43 |     dyn_range.next().await;
+///    |     ^^^^^^^^^^^^^^^^ cannot borrow as mutable
+///    |
+///    = help: trait `DerefMut` is required to modify through a dereference, but it is not implemented for `dyner::Ref<DynAsyncIter<'_, u32>>`
+/// ```
+///
+/// when we compile
 ///
 /// ```compile_fail
-/// let mut range = yielding_range::YieldingRange::new(0, 10);
+/// let range = yielding_range::YieldingRange::new(0, 10);
 /// let mut dyn_range = async_iter::DynAsyncIter::from_ref(&range);
 /// dyn_range.next().await;
 /// ```
+///
+/// because `next` is an `&mut self` method.
 #[tokio::test]
 async fn ref_dyn_async_iter() {}
 
