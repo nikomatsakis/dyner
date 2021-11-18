@@ -14,7 +14,10 @@ mod async_iter {
         fn next(&mut self) -> Self::Next<'_>;
     }
 
-    type ErasedData = ();
+    use private::ErasedData;
+    mod private {
+        pub struct ErasedData(());
+    }
 
     pub struct DynAsyncIter<Item> {
         data: *mut ErasedData,
@@ -34,8 +37,8 @@ mod async_iter {
     // }
 
     struct ErasedDynAsyncIterVtable {
-        drop_fn: usize,
-        next_fn: usize,
+        drop_fn: *mut (),
+        next_fn: *mut (),
     }
 
     impl<Item> AsyncIter for DynAsyncIter<Item> {
@@ -68,7 +71,7 @@ mod async_iter {
         {
             let boxed_value = Box::new(value);
             DynAsyncIter {
-                data: Box::into_raw(boxed_value) as *mut (),
+                data: Box::into_raw(boxed_value) as *mut ErasedData,
                 vtable: dyn_async_iter_vtable::<T>(), // we’ll cover this fn later
                 phantom: PhantomData,
             }
@@ -108,13 +111,19 @@ mod async_iter {
     where
         T: AsyncIter,
     {
+        // (Generic) inline-`const` polyfill.
+        trait GenericConstHelper<T> {
+            const VTABLE: ErasedDynAsyncIterVtable;
+        }
+        impl<T: AsyncIter> GenericConstHelper<T> for () {
+            const VTABLE: ErasedDynAsyncIterVtable = ErasedDynAsyncIterVtable {
+                drop_fn: drop_wrapper::<T> as _,
+                next_fn: next_wrapper::<T> as _,
+            };
+        }
         // FIXME: This would ideally be `&DynAsyncIterVtable<T>`,
-        // but we have to hide the types from the compiler, and even so
-        // I can't convince it to promote this value to `'static`.
-        Box::leak(Box::new(ErasedDynAsyncIterVtable {
-            drop_fn: drop_wrapper::<T> as usize,
-            next_fn: next_wrapper::<T> as usize,
-        }))
+        // but we have to hide the types from the compiler
+        &<() as GenericConstHelper<T>>::VTABLE
     }
 }
 
