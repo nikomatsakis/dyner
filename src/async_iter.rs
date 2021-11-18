@@ -12,7 +12,7 @@ pub trait AsyncIter {
 }
 
 pub struct DynAsyncIter<'data, Item> {
-    fatptr: Box<dyn ErasedAsyncIter<Item = Item> + 'data>,
+    fatptr: *mut (dyn ErasedAsyncIter<Item = Item> + 'data),
 }
 
 trait ErasedAsyncIter {
@@ -40,7 +40,7 @@ impl<'data, Item> AsyncIter for DynAsyncIter<'data, Item> {
     = Pin<Box<dyn Future<Output = Option<Item>> + 'me>>;
 
     fn next(&mut self) -> Self::Next<'_> {
-        self.fatptr.next()
+        unsafe { ErasedAsyncIter::next(&mut *self.fatptr) }
     }
 }
 
@@ -50,8 +50,17 @@ impl<'data, Item> DynAsyncIter<'data, Item> {
         T: AsyncIter<Item = Item> + 'data,
         Item: 'data,
     {
+        let b = Box::new(value);
         DynAsyncIter {
-            fatptr: Box::new(value),
+            fatptr: Box::into_raw(b),
+        }
+    }
+}
+
+impl<'data, Item> Drop for DynAsyncIter<'data, Item> {
+    fn drop(&mut self) {
+        unsafe {
+            Box::from_raw(self.fatptr);
         }
     }
 }
