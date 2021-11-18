@@ -10,6 +10,12 @@ pub trait AsyncIter {
         Self: 'me;
 
     fn next(&mut self) -> Self::Next<'_>;
+
+    type SizeHint<'me>: Future<Output = Option<usize>>
+    where
+        Self: 'me;
+
+    fn size_hint(&self) -> Self::SizeHint<'_>;
 }
 
 // May Athena forgive me for what I do here]
@@ -55,6 +61,7 @@ pub struct DynAsyncIter<'data, Item> {
 trait ErasedAsyncIter {
     type Item;
     fn next<'me>(&'me mut self) -> Pin<Box<dyn Future<Output = Option<Self::Item>> + 'me>>;
+    fn size_hint<'me>(&'me self) -> Pin<Box<dyn Future<Output = Option<usize>> + 'me>>;
 }
 
 impl<T> ErasedAsyncIter for T
@@ -62,8 +69,13 @@ where
     T: AsyncIter,
 {
     type Item = T::Item;
+
     fn next<'me>(&'me mut self) -> Pin<Box<dyn Future<Output = Option<Self::Item>> + 'me>> {
         Box::pin(AsyncIter::next(self))
+    }
+
+    fn size_hint<'me>(&'me self) -> Pin<Box<dyn Future<Output = Option<usize>> + 'me>> {
+        Box::pin(AsyncIter::size_hint(self))
     }
 }
 
@@ -78,6 +90,16 @@ impl<'data, Item> AsyncIter for DynAsyncIter<'data, Item> {
 
     fn next(&mut self) -> Self::Next<'_> {
         unsafe { ErasedAsyncIter::next(&mut *self.fatptr.untagged()) }
+    }
+
+    type SizeHint<'me>
+    where
+        Item: 'me,
+        'data: 'me,
+    = Pin<Box<dyn Future<Output = Option<usize>> + 'me>>;
+
+    fn size_hint(&self) -> Self::SizeHint<'_> {
+        unsafe { ErasedAsyncIter::size_hint(&*self.fatptr.untagged()) }
     }
 }
 

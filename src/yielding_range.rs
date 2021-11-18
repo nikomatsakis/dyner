@@ -30,4 +30,14 @@ impl AsyncIter for YieldingRange {
             }
         }
     }
+
+    type SizeHint<'me> = impl Future<Output = Option<usize>> + 'me;
+
+    fn size_hint(&self) -> Self::SizeHint<'_> {
+        async move {
+            task::yield_now().await;
+            let hint: usize = (self.stop - self.start) as usize;
+            Some(hint)
+        }
+    }
 }
