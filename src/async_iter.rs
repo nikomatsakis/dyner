@@ -1,5 +1,5 @@
+use crate::dyner::{Ref, RefMut};
 use std::future::Future;
-use std::mem::ManuallyDrop;
 use std::pin::Pin;
 
 pub trait AsyncIter {
@@ -87,12 +87,38 @@ impl<'data, Item> DynAsyncIter<'data, Item> {
         T: AsyncIter<Item = Item> + 'data,
         Item: 'data,
     {
+        let b: Box<dyn ErasedAsyncIter<Item = Item>> = Box::new(value);
+        let raw: *mut dyn ErasedAsyncIter<Item = Item> = Box::into_raw(b);
         unsafe {
-            let b: Box<dyn ErasedAsyncIter<Item = Item>> = Box::new(value);
             DynAsyncIter {
-                fatptr: FatPtr::new(Box::into_raw(b)).tagged(),
+                fatptr: FatPtr::new(raw).tagged(),
             }
         }
+    }
+
+    pub fn from_ref<T>(value: &'data T) -> Ref<DynAsyncIter<'data, Item>>
+    where
+        T: AsyncIter<Item = Item> + 'data,
+        Item: 'data,
+    {
+        let v: &dyn ErasedAsyncIter<Item = Item> = value;
+        let raw: *const dyn ErasedAsyncIter<Item = Item> = v;
+        let raw: *mut dyn ErasedAsyncIter<Item = Item> = raw as *mut _;
+        Ref::new(DynAsyncIter {
+            fatptr: FatPtr::new(raw),
+        })
+    }
+
+    pub fn from_ref_mut<T>(value: &'data mut T) -> RefMut<DynAsyncIter<'data, Item>>
+    where
+        T: AsyncIter<Item = Item> + 'data,
+        Item: 'data,
+    {
+        let v: &mut dyn ErasedAsyncIter<Item = Item> = value;
+        let raw: *mut dyn ErasedAsyncIter<Item = Item> = v;
+        RefMut::new(DynAsyncIter {
+            fatptr: FatPtr::new(raw),
+        })
     }
 }
 
