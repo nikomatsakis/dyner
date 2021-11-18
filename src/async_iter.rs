@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 
 pub trait AsyncIter {
@@ -11,8 +12,44 @@ pub trait AsyncIter {
     fn next(&mut self) -> Self::Next<'_>;
 }
 
+// May Athena forgive me for what I do here]
+union FatPtr<'data, Item> {
+    raw: *mut (dyn ErasedAsyncIter<Item = Item> + 'data),
+    usizes: (usize, usize),
+}
+
+impl<'data, Item> Copy for FatPtr<'data, Item> {}
+
+impl<'data, Item> Clone for FatPtr<'data, Item> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'data, Item> FatPtr<'data, Item> {
+    fn new(raw: *mut (dyn ErasedAsyncIter<Item = Item> + 'data)) -> Self {
+        FatPtr { raw }
+    }
+
+    unsafe fn untagged(mut self) -> *mut (dyn ErasedAsyncIter<Item = Item> + 'data) {
+        self.usizes.0 &= !1;
+        self.raw
+    }
+
+    unsafe fn is_tagged(self) -> bool {
+        (self.usizes.0 & 1) != 0
+    }
+
+    unsafe fn tagged(self) -> Self {
+        let (data, vtable) = self.usizes;
+        FatPtr {
+            usizes: (data | 1, vtable),
+        }
+    }
+}
+
 pub struct DynAsyncIter<'data, Item> {
-    fatptr: *mut (dyn ErasedAsyncIter<Item = Item> + 'data),
+    fatptr: FatPtr<'data, Item>,
 }
 
 trait ErasedAsyncIter {
@@ -40,7 +77,7 @@ impl<'data, Item> AsyncIter for DynAsyncIter<'data, Item> {
     = Pin<Box<dyn Future<Output = Option<Item>> + 'me>>;
 
     fn next(&mut self) -> Self::Next<'_> {
-        unsafe { ErasedAsyncIter::next(&mut *self.fatptr) }
+        unsafe { ErasedAsyncIter::next(&mut *self.fatptr.untagged()) }
     }
 }
 
@@ -50,9 +87,11 @@ impl<'data, Item> DynAsyncIter<'data, Item> {
         T: AsyncIter<Item = Item> + 'data,
         Item: 'data,
     {
-        let b = Box::new(value);
-        DynAsyncIter {
-            fatptr: Box::into_raw(b),
+        unsafe {
+            let b: Box<dyn ErasedAsyncIter<Item = Item>> = Box::new(value);
+            DynAsyncIter {
+                fatptr: FatPtr::new(Box::into_raw(b)).tagged(),
+            }
         }
     }
 }
@@ -60,7 +99,9 @@ impl<'data, Item> DynAsyncIter<'data, Item> {
 impl<'data, Item> Drop for DynAsyncIter<'data, Item> {
     fn drop(&mut self) {
         unsafe {
-            Box::from_raw(self.fatptr);
+            if self.fatptr.is_tagged() {
+                drop(Box::from_raw(self.fatptr.untagged()));
+            }
         }
     }
 }
