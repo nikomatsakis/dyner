@@ -4,5 +4,7 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Dyner - More dyn than ever"
-repository = "https://github.com/nikomatsakis/dyner"
+
+[output.html]
+git-repository-url = "https://github.com/nikomatsakis/dyner"
 edit-url-template = "https://github.com/nikomatsakis/dyner/edit/master/{path}"
