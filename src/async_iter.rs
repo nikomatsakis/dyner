@@ -18,7 +18,7 @@ pub trait AsyncIter {
     fn size_hint(&self) -> Self::SizeHint<'_>;
 }
 
-// May Athena forgive me for what I do here]
+// May Athena forgive me for what I do here
 union FatPtr<'data, Item> {
     raw: *mut (dyn ErasedAsyncIter<Item = Item> + 'data),
     usizes: (usize, usize),
