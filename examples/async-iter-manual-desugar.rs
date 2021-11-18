@@ -2,7 +2,8 @@
 #![feature(type_alias_impl_trait)]
 
 mod async_iter {
-    use std::{future::Future, intrinsics::transmute, marker::PhantomData, pin::Pin};
+    use std::future::Future;
+    use std::pin::Pin;
 
     pub trait AsyncIter {
         type Item;
@@ -14,120 +15,53 @@ mod async_iter {
         fn next(&mut self) -> Self::Next<'_>;
     }
 
-    use private::ErasedData;
-    mod private {
-        pub struct ErasedData(());
+    pub struct DynAsyncIter<'data, Item> {
+        fatptr: Box<dyn ErasedAsyncIter<Item = Item> + 'data>,
     }
 
-    pub struct DynAsyncIter<Item> {
-        data: *mut ErasedData,
-        vtable: &'static ErasedDynAsyncIterVtable,
-        phantom: PhantomData<fn(Item) -> Item>,
+    trait ErasedAsyncIter {
+        type Item;
+        fn next<'me>(&'me mut self) -> Pin<Box<dyn Future<Output = Option<Self::Item>> + 'me>>;
     }
 
-    type DropFnType = unsafe fn(*mut ErasedData);
-    type NextFnType<Item> = for<'a> unsafe fn(
-        &'a mut *mut ErasedData,
-    )
-        -> Pin<Box<dyn Future<Output = Option<Item>> + 'a>>;
-
-    // struct DynAsyncIterVtable<Item> {
-    //     drop_fn: DropFnType,
-    //     next_fn: NextFnType<Item>,
-    // }
-
-    struct ErasedDynAsyncIterVtable {
-        drop_fn: *mut (),
-        next_fn: *mut (),
+    impl<T> ErasedAsyncIter for T
+    where
+        T: AsyncIter,
+    {
+        type Item = T::Item;
+        fn next<'me>(&'me mut self) -> Pin<Box<dyn Future<Output = Option<Self::Item>> + 'me>> {
+            Box::pin(AsyncIter::next(self))
+        }
     }
 
-    impl<Item> AsyncIter for DynAsyncIter<Item> {
+    impl<'data, Item> AsyncIter for DynAsyncIter<'data, Item> {
         type Item = Item;
 
         type Next<'me>
         where
             Item: 'me,
+            'data: 'me,
         = Pin<Box<dyn Future<Output = Option<Item>> + 'me>>;
 
         fn next(&mut self) -> Self::Next<'_> {
-            let next_fn: NextFnType<Item> = unsafe { transmute(self.vtable.next_fn) };
-            unsafe { next_fn(&mut self.data) }
+            self.fatptr.next()
         }
     }
 
-    impl<Item> Drop for DynAsyncIter<Item> {
-        fn drop(&mut self) {
-            let drop_fn: DropFnType = unsafe { transmute(self.vtable.drop_fn) };
-            unsafe {
-                drop_fn(self.data);
-            }
-        }
-    }
-
-    impl<Item> DynAsyncIter<Item> {
-        pub fn new<T>(value: T) -> DynAsyncIter<Item>
+    impl<'data, Item> DynAsyncIter<'data, Item> {
+        pub fn new<T>(value: T) -> DynAsyncIter<'data, Item>
         where
-            T: AsyncIter<Item = Item>,
+            T: AsyncIter<Item = Item> + 'data,
+            Item: 'data,
         {
-            let boxed_value = Box::new(value);
             DynAsyncIter {
-                data: Box::into_raw(boxed_value) as *mut ErasedData,
-                vtable: dyn_async_iter_vtable::<T>(), // we’ll cover this fn later
-                phantom: PhantomData,
+                fatptr: Box::new(value),
             }
         }
-    }
-
-    // Safety conditions:
-    //
-    // The `*mut ErasedData` is actually the raw form of a `Box<T>`
-    // that is valid for ‘a.
-    unsafe fn next_wrapper<'a, T>(
-        this: &'a mut *mut ErasedData,
-    ) -> Pin<Box<dyn Future<Output = Option<T::Item>> + 'a>>
-    where
-        T: AsyncIter + 'a,
-    {
-        let this_raw: *mut *mut ErasedData = this;
-        let this_raw: *mut Box<T> = this_raw as *mut Box<T>;
-        let unerased_this: &mut Box<T> = &mut *this_raw;
-        let future: T::Next<'_> = <T as AsyncIter>::next(unerased_this);
-        Box::pin(future)
-    }
-
-    // Safety conditions:
-    //
-    // The `*mut ErasedData` is actually the raw form of a `Box<T>`
-    // and this function is being given ownership of it.
-    unsafe fn drop_wrapper<T>(this: *mut ErasedData)
-    where
-        T: AsyncIter,
-    {
-        let unerased_this = Box::from_raw(this as *mut T);
-        drop(unerased_this); // Execute destructor as normal
-    }
-
-    fn dyn_async_iter_vtable<T>() -> &'static ErasedDynAsyncIterVtable
-    where
-        T: AsyncIter,
-    {
-        // (Generic) inline-`const` polyfill.
-        trait GenericConstHelper<T> {
-            const VTABLE: ErasedDynAsyncIterVtable;
-        }
-        impl<T: AsyncIter> GenericConstHelper<T> for () {
-            const VTABLE: ErasedDynAsyncIterVtable = ErasedDynAsyncIterVtable {
-                drop_fn: drop_wrapper::<T> as _,
-                next_fn: next_wrapper::<T> as _,
-            };
-        }
-        // FIXME: This would ideally be `&DynAsyncIterVtable<T>`,
-        // but we have to hide the types from the compiler
-        &<() as GenericConstHelper<T>>::VTABLE
     }
 }
 
-mod yielding_range {
+pub mod yielding_range {
     use crate::async_iter::AsyncIter;
     use std::future::Future;
     use tokio::task;
