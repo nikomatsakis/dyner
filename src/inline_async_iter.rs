@@ -56,3 +56,21 @@ where
         panic!()
     }
 }
+
+#[tokio::test]
+async fn next() {
+    let range = crate::yielding_range::YieldingRange::new(0, 10);
+    let mut inline_range = InlineAsyncIterImpl::new(range);
+    for i in 0..10 {
+        assert_eq!(inline_range.next().await, Some(i));
+    }
+    assert_eq!(inline_range.next().await, None);
+}
+
+// #[tokio::test]
+// async fn next_error() {
+//     let range = crate::yielding_range::YieldingRange::new(0, 10);
+//     let mut inline_range = InlineAsyncIterImpl::new(range);
+//     let n1 = inline_range.next();
+//     let n2 = inline_range.next();
+// }
