@@ -3,6 +3,7 @@
 
 mod async_iter;
 mod dyner;
+mod inline_async_iter;
 mod yielding_range;
 
 use async_iter::AsyncIter;
@@ -60,3 +61,5 @@ async fn ref_dyn_async_iter_size_hint() {
     let dyn_range = async_iter::DynAsyncIter::from_ref(&range);
     assert_eq!(dyn_range.size_hint().await, Some(10));
 }
+
+fn main() {}
