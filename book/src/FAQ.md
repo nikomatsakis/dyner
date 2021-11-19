@@ -14,6 +14,39 @@ Or maybe "dinner".
 
 Whatever floats your boat!
 
+## Does dyner have a theme song?
+
+Why, it does! So glad you asked! It goes to the tune of, "I've been working on the railroad".
+
+```
+I've been working on my rust code
+All the live long day
+Got a problem in my Rust code
+Static dispatch is in the way
+
+Too many copies of my function
+One for every type I use
+Mono-, monomorphization
+It's... so easy to abuse  OR   so what... you gonna do?
+
+Dyner up my code
+Dyner up my code
+Dyner up the traits in my coh-oh-ode
+Dyner up my code
+Dyner up my code
+Dyner up the traits in my code
+
+Dynamic dispatch with dyner
+It's pretty easy to do-ooh-ooh
+Dynamic dispatch with dyner
+It's fun for me and you
+
+D, Y, N E R
+D, Y, N E R-R-R-R
+D, Y, N E-eeee Rrrrr
+Dynamic dispatch in my code
+```
+
 ## Does `dyner` work for no-std crates?
 
 Yes! But without access to the `Box` type, you can only pass trait objects that are stored in references.
