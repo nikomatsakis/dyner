@@ -27,7 +27,7 @@ Static dispatch is in the way
 Too many copies of my function
 One for every type I use
 Mono-, monomorphization
-It's... so easy to abuse  OR   so what... you gonna do?
+It's... so easy to abuse
 
 Dyner up my code
 Dyner up my code
