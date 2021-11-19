@@ -2,6 +2,7 @@
 #![feature(type_alias_impl_trait)]
 
 mod async_iter;
+mod dyn_async_iter;
 mod dyner;
 mod inline_async_iter;
 mod yielding_range;
