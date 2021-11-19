@@ -86,3 +86,51 @@ impl<'me, Output> Future for InlineFuture<'me, Output> {
         }
     }
 }
+
+pub struct InlineRefCellFuture<'me, Output> {
+    future: std::cell::RefMut<'me, dyn Future<Output = Output> + 'me>,
+}
+
+impl<'me, Output> InlineRefCellFuture<'me, Output> {
+    /// Safe:
+    ///
+    /// * `*future` belongs to us for duration of `'me`
+    ///
+    /// Unsafe:
+    ///
+    /// * `*future` must be initialized
+    /// * `*future` must not be used again without having been reinitialized (which must occur after `'me` ends)
+    pub unsafe fn new(
+        future: std::cell::RefMut<'me, MaybeUninit<impl Future<Output = Output>>>,
+    ) -> Self {
+        let future = std::cell::RefMut::map(
+            future,
+            |f: &mut _| -> &mut (dyn Future<Output = Output> + 'me) { f.assume_init_mut() },
+        );
+
+        Self { future }
+    }
+}
+
+impl<'me, Output> Drop for InlineRefCellFuture<'me, Output> {
+    fn drop(&mut self) {
+        unsafe {
+            std::ptr::drop_in_place(&mut *self.future);
+        }
+    }
+}
+
+impl<'me, Output> Future for InlineRefCellFuture<'me, Output> {
+    type Output = Output;
+
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        unsafe {
+            let mu: &mut dyn Future<Output = Output> = &mut *self.get_unchecked_mut().future;
+            let mut mu_pin: Pin<&mut dyn Future<Output = Output>> = Pin::new_unchecked(mu);
+            <Pin<&mut dyn Future<Output = Output>> as Future>::poll(Pin::new(&mut mu_pin), cx)
+        }
+    }
+}
