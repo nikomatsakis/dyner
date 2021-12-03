@@ -4,6 +4,7 @@
 mod async_iter;
 mod dyn_async_iter;
 mod dyner;
+mod dynerx;
 mod inline_async_iter;
 mod yielding_range;
 
