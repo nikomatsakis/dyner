@@ -82,28 +82,28 @@ where
 // dyn &Foo
 // &Foo was shorthand for Deref<Target: Foo>
 
-struct DynLen {
-    ptr: *const dyn ErasedLen,
+struct DynLen<'data> {
+    ptr: *const (dyn ErasedLen + 'data),
 }
 
-impl<T: 'static> From<Rc<T>> for DynLen
+impl<'data, T: 'data> From<Rc<T>> for DynLen<'data>
 where
     T: Len,
 {
-    fn from(value: Rc<T>) -> DynLen {
+    fn from(value: Rc<T>) -> DynLen<'data> {
         let v: *const Remember<Rc<T>> = Remember::new(value);
-        let v: *const dyn ErasedLen = v;
+        let v: *const (dyn ErasedLen + 'data) = v;
         DynLen { ptr: v }
     }
 }
 
-impl Len for DynLen {
+impl Len for DynLen<'_> {
     fn len(&self) -> usize {
         unsafe { ErasedLen::len(&*self.ptr) }
     }
 }
 
-impl Drop for DynLen {
+impl Drop for DynLen<'_> {
     fn drop(&mut self) {
         unsafe { ErasedLen::drop_me(&*self.ptr) }
     }
