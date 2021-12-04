@@ -84,7 +84,7 @@ impl<T: RawDeref> Remember<T> {
 
 impl<T> ErasedLen for Remember<T>
 where
-    T: Deref + RawDeref,
+    T: RawDeref,
     T::Target: Len,
 {
     fn len(&self) -> usize {
