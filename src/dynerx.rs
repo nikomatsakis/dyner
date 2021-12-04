@@ -1,7 +1,5 @@
 use std::{
-    future::Future,
-    ops::{Deref, DerefMut},
-    pin::Pin,
+    ops::Deref,
     rc::Rc,
 };
 
@@ -66,7 +64,7 @@ impl<T: RawDeref> Remember<T> {
 
 impl<T> ErasedLen for Remember<T>
 where
-    T: Deref,
+    T: Deref + RawDeref,
     T::Target: Len,
 {
     fn len(&self) -> usize {
@@ -76,7 +74,7 @@ where
     // FIXME: This is probably UB, and should be *const self
     fn drop_me(&self) {
         unsafe {
-            let value: T = T::from_raw(self.t);
+            let _value: T = T::from_raw(&self.t as *const _);
         }
     }
 }
@@ -88,16 +86,14 @@ struct DynLen {
     ptr: *const dyn ErasedLen,
 }
 
-impl<T> From<Rc<T>> for DynLen
+impl<T: 'static> From<Rc<T>> for DynLen
 where
     T: Len,
 {
     fn from(value: Rc<T>) -> DynLen {
-        unsafe {
-            let v: *const Remember<Rc<T>> = Remember::new(value);
-            let v: *const dyn ErasedLen = v;
-            DynLen { ptr: v }
-        }
+        let v: *const Remember<Rc<T>> = Remember::new(value);
+        let v: *const dyn ErasedLen = v;
+        DynLen { ptr: v }
     }
 }
 
