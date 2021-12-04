@@ -1,7 +1,4 @@
-use std::{
-    ops::Deref,
-    rc::Rc,
-};
+use std::{ops::Deref, rc::Rc};
 
 trait Len {
     fn len(&self) -> usize;
@@ -55,11 +52,11 @@ impl<T> RawDeref for Box<T> {
 
 impl<T> RawDeref for &T {
     fn into_raw(this: Self) -> *const T {
-        this as _
+        this
     }
 
     unsafe fn from_raw(target: *const T) -> Self {
-        std::mem::transmute(target)
+        &*target
     }
 }
 
@@ -94,7 +91,7 @@ where
     // FIXME: This is probably UB, and should be *const self
     fn drop_me(&self) {
         unsafe {
-            let _value: T = T::from_raw(&self.t as *const _);
+            let _value: T = T::from_raw(std::ptr::addr_of!(self.t));
         }
     }
 }
